@@ -1,7 +1,9 @@
 const User = require("../models/User")
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken');
-const { ACCESS_TOKEN_PRIVATE_KEY } = require("../config/configs");
+const { ACCESS_TOKEN_PRIVATE_KEY, NODE_ENV } = require("../config/configs");
+const cloudinary = require("cloudinary").v2
+// const { ACCESS_TOKEN_PRIVATE_KEY } = require("../config/configs");
  
  const signupController = async (req, res) =>{
     const {fullName, email, password} = req.body;
@@ -106,11 +108,12 @@ const logoutController = (req, res) =>{
 
 const generateAccessToken = async (userId, res) => {
 	try {
-		const token = jwt.sign(userId, ACCESS_TOKEN_PRIVATE_KEY, {
-			expiresIn: '1d',
+		const token = jwt.sign({userId}, ACCESS_TOKEN_PRIVATE_KEY, {
+			expiresIn: '7d',
 		});
         
       res.cookie("jwt", token, {
+        // maxAge: 7 = 24*60*60*1000,
         httpOnly: true,
         sameSite:"strict",
         secure:NODE_ENV !== "development"
@@ -122,12 +125,46 @@ const generateAccessToken = async (userId, res) => {
 	}
 };
 
+const updateprofile = async ()=>{
+    try {
+        const {profilePic} = req.body;
+        const userId = req.user._id;
+        
+        if(!profilePic){
+            return res.status(400).json({message:"profile pic is required"})
+        }
+      const uploadResponse =  await cloudinary.uploader.upload(profilePic)
+      const updateUser = await User.findByIdAndUpdate(
+        userId,
+        {profilePic: uploadResponse.secure_url},
+        {new:true}
+      )
+      es.status(200).json(updateUser)
+    } catch (err) {
+        console.log("error in update profile", err.message);
+        res.status(500).json({message: "internal server error"})
+        
+        
+    }
+}
 
+const checkAuth = (req, res)=>{
+    try {
+        res.status(200).json(req.user)
+    } catch (err) {
+        console.log("error in checkAuth controller ", err.message)
+        res.status(500).json({message: "internal server error"})
+        
+        
+    }
+}
 
 
 
 module.exports = {
     signupController,
     loginController,
-    logoutController
+    logoutController,
+    updateprofile,
+    checkAuth
 }
